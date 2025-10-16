@@ -1,0 +1,71 @@
+name: 'GitLab Push Mirror'
+description: 'Mirror the current GitHub repository to a GitLab repository'
+author: 'prithweedas'
+
+inputs:
+  gitlab-org:
+    description: 'GitLab organization or username'
+    required: true
+  gitlab-repo:
+    description: 'GitLab repository name'
+    required: true
+  gitlab-token:
+    description: 'GitLab personal access token with repository permissions'
+    required: true
+  gitlab-url:
+    description: 'GitLab instance URL (defaults to gitlab.com)'
+    required: false
+    default: 'https://gitlab.com'
+  github-token:
+    description: 'GitHub token for accessing private repositories (defaults to GITHUB_TOKEN)'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Mirror repository to GitLab
+      shell: bash
+      env:
+        GITLAB_TOKEN: ${{ inputs.gitlab-token }}
+        GITLAB_ORG: ${{ inputs.gitlab-org }}
+        GITLAB_REPO: ${{ inputs.gitlab-repo }}
+        GITLAB_URL: ${{ inputs.gitlab-url }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        echo "🔄 Starting repository mirror to GitLab..."
+        
+        # Extract the domain from GitLab URL
+        GITLAB_DOMAIN=$(echo "$GITLAB_URL" | sed 's|https://||' | sed 's|http://||')
+        
+        # Construct GitLab remote URL with token authentication
+        GITLAB_REMOTE_URL="https://oauth2:${GITLAB_TOKEN}@${GITLAB_DOMAIN}/${GITLAB_ORG}/${GITLAB_REPO}.git"
+        
+        # Construct GitHub clone URL with token authentication for private repos
+        GITHUB_CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        
+        # Create a temporary directory for the bare clone
+        TEMP_DIR=$(mktemp -d)
+        echo "📁 Using temporary directory: $TEMP_DIR"
+        
+        # Clone the current repository as a bare repository with authentication
+        echo "📥 Creating bare clone of the repository..."
+        git clone --bare "$GITHUB_CLONE_URL" "$TEMP_DIR/repo.git"
+        
+        # Change to the bare repository directory
+        cd "$TEMP_DIR/repo.git"
+        
+        # Mirror push to GitLab (this pushes all refs: branches, tags, etc.)
+        echo "� Mirror pushing to GitLab..."
+        git push --mirror "$GITLAB_REMOTE_URL"
+        
+        # Clean up
+        cd /
+        rm -rf "$TEMP_DIR"
+        
+        echo "✅ Repository successfully mirrored to GitLab!"
+        echo "📍 GitLab Repository: ${GITLAB_URL}/${GITLAB_ORG}/${GITLAB_REPO}"
+
+branding:
+  icon: 'git-branch'
+  color: 'orange'
