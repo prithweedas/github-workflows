@@ -1,0 +1,65 @@
+name: 'Branch Cleanup'
+description: 'Delete stale branches'
+author: 'prithweedas'
+
+inputs:
+  github-token:
+    description: 'GitHub token with repository permissions'
+    required: true
+    default: ${{ github.token }}
+  
+  days-old:
+    description: 'Number of days after which to delete branches (default: 14)'
+    required: false
+    default: '14'
+  
+  dry-run:
+    description: 'Preview branches that would be deleted without actually deleting them'
+    required: false
+    default: 'false'
+  
+  protected-branches:
+    description: 'Comma-separated list of branch names to protect from deletion (in addition to default branch)'
+    required: false
+    default: 'main,master,develop,staging,production'
+  
+  exclude-pattern:
+    description: 'Regex pattern for branch names to exclude from deletion'
+    required: false
+    default: ''
+
+outputs:
+  deleted-branches:
+    description: 'JSON array of deleted branch names'
+  
+  skipped-branches:
+    description: 'JSON array of skipped branch names with reasons'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        npm install --only=production --no-package-lock
+        
+    - name: Run branch cleanup
+      shell: bash
+      run: node ${{ github.action_path }}/index.js
+      env:
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_DAYS_OLD: ${{ inputs.days-old }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        INPUT_PROTECTED_BRANCHES: ${{ inputs.protected-branches }}
+        INPUT_EXCLUDE_PATTERN: ${{ inputs.exclude-pattern }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+
+branding:
+  icon: 'trash-2'
+  color: 'red'
